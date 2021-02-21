@@ -23,8 +23,12 @@ public class WorldGenerator : MonoBehaviour
     public float EventChunkMidPoint = 10; 
 
     public int Seed;
+    public int StackSize;
 
-    private Vector2 Location;
+    public Vector3 CameraMargin = new Vector3(0.5f, 0.5f);
+
+    public Vector2 PreviousLocation;
+    public Vector2 Location;
         // -1, 1  NorthEast
         //  0, 1  North
         //  1, 1  NorthWest
@@ -34,34 +38,68 @@ public class WorldGenerator : MonoBehaviour
         // -1,-1  SouthEast
         //  0,-1  South
         //  1,-1  SouthWest
+    
+    public enum GenerationState
+    {
+        Clean,
+        HasGenerated,
+        Dirty
+    }
+    public GenerationState State;
 
     // Start is called before the first frame update
     void Start()
     {
-        
+        Initialise();
+    }
+
+    void Initialise()
+    {
+        NextWorldChunks = new NextWorldChunks();
+        PreviousWorldChunks = new Stack<WorldChunk>();
+        GenerateQueue();
     }
 
     // Update is called once per frame
     void Update()
     {
-        // Destroying the current (previous) chunk, when its no longer visible
-        if (!CurrentChunk.IsVisible)
+        // Setting current chunk if it got destroyed
+        if (CurrentChunk == null)
         {
-            Destroy(CurrentChunk.gameObject);
-            foreach(var chunk in NextWorldChunks.Chunks)
+            foreach (var chunk in NextWorldChunks.Chunks)
             {
                 if (chunk.IsPositionInChunk(Player.position))
                 {
                     CurrentChunk = chunk;
                     NextWorldChunks.Chunks.Remove(chunk);
+                    State = GenerationState.Clean;
+                    break;
                 }
-                break;
             }
+        }
+
+        if (State != GenerationState.Clean && NextWorldChunks != null)
+        {
+            foreach (var chunk in NextWorldChunks.Chunks)
+            {
+                if (chunk == null) NextWorldChunks.Chunks.Remove(chunk);
+            }
+            State = GenerationState.Clean;
+        }
+
+        // Destroying the current (previous) chunk, when its no longer visible
+        // TODO: also need to remove from memory
+        /*
+        if (CurrentChunk != null && !CurrentChunk.IsVisible && State != GenerationState.Clean)
+        {
+            PreviousWorldChunks.Push(CurrentChunk);
+            Destroy(CurrentChunk);
+            CurrentChunk = null;
         }
 
         // destroying any of the next chunks if they become no longer visible
         // putting them back into the worldchunks stack, as they won't have been properly explored yet
-        if (NextWorldChunks != null && NextWorldChunks.Chunks.Count > 0)
+        if (NextWorldChunks != null && NextWorldChunks.Chunks.Count > 0 && State != GenerationState.Clean)
         {
             foreach (var chunk in NextWorldChunks.Chunks)
             {
@@ -70,17 +108,28 @@ public class WorldGenerator : MonoBehaviour
                     NextWorldChunks.Chunks.Remove(chunk);
                     WorldChunks.Push(chunk);
                     Destroy(chunk);
+                    State = GenerationState.Clean;
                 }
             }
         }
+        if (NextWorldChunks != null && NextWorldChunks.Chunks.Count == 0 && State != GenerationState.Clean)
+            State = GenerationState.Dirty;
+        */
+
+        CalculatePlayerLocation();
+        if (Location != PreviousLocation && Location != Vector2.zero && State == GenerationState.Clean)
+        {
+            CreateNextWorldChunks();
+            State = GenerationState.HasGenerated;
+        }
     }
 
-    void GenerateQueue(Random rand)
+    void GenerateQueue()
     {
+        var rand = new Random(Seed);
         WorldChunks = new Stack<WorldChunk>();
 
-        var queueLength = 20;
-        for (int i = 0; i < queueLength; i++)
+        for (int i = 0; i < StackSize; i++)
         {
             WorldChunks.Push(AllWorldChunks[rand.Next(AllWorldChunks.Count)]);
         }
@@ -93,77 +142,147 @@ public class WorldGenerator : MonoBehaviour
         var isCorner = Mathf.Abs(Location.x) + Mathf.Abs(Location.y) == 2;
         NextWorldChunks = GetNextWorldChunks(isCorner);
 
+        var position = CurrentChunk.transform.position + new Vector3(CurrentChunk.Width * Location.x, CurrentChunk.Height * Location.y);
         // Instantiating chunk adjacent to location, if one isn't already there
-        Instantiate(
-            NextWorldChunks.Chunks[0],
-            CurrentChunk.transform.position + new Vector3(CurrentChunk.Width * Location.x, CurrentChunk.Height * Location.y),
-            Quaternion.identity);
+        var chunk = ChunkAtPosition(position);
+        if (chunk == null)
+            NextWorldChunks.Chunks[0] = Instantiate(
+                NextWorldChunks.Chunks[0],
+                position,
+                Quaternion.identity);
+        else
+            NextWorldChunks.Chunks[0] = chunk;
 
         // Instantiating edge chunks, if location is in corner
         if (isCorner)
         {
-            Instantiate(
-                NextWorldChunks.Chunks[1],
-                CurrentChunk.transform.position + new Vector3(CurrentChunk.Width * Location.x, 0),
-                Quaternion.identity);
-            Instantiate(
-                NextWorldChunks.Chunks[2],
-                CurrentChunk.transform.position + new Vector3(0, CurrentChunk.Height * Location.y),
-                Quaternion.identity);
+            position = CurrentChunk.transform.position + new Vector3(CurrentChunk.Width * Location.x, 0);
+            chunk = ChunkAtPosition(position);
+            if (chunk == null)
+                NextWorldChunks.Chunks[1] = Instantiate(
+                    NextWorldChunks.Chunks[1],
+                    position,
+                    Quaternion.identity);
+            else
+                NextWorldChunks.Chunks[1] = chunk;
+
+            position = CurrentChunk.transform.position + new Vector3(0, CurrentChunk.Height * Location.y);
+            chunk = ChunkAtPosition(position);
+            if (chunk == null)
+                NextWorldChunks.Chunks[2] = Instantiate(
+                    NextWorldChunks.Chunks[2],
+                    position,
+                    Quaternion.identity);
+            else
+                NextWorldChunks.Chunks[2] = chunk;
         }
+    }
+
+    void CalculatePlayerLocation()
+    {
+        PreviousLocation = Location;
+
+        var cameraExtent = GetCameraExtent();
+        var chunkBoundsMax = GetChunkBoundsMax(cameraExtent);
+        var chunkBoundsMin = GetChunkBoundsMin(cameraExtent);
+
+        var cameraRelativePos = Camera.main.transform.InverseTransformPoint(CurrentChunk.transform.position);
+
+        int x;
+        int y;
+
+        if (cameraRelativePos.x < chunkBoundsMin.x) x = 1;
+        else if (cameraRelativePos.x > chunkBoundsMax.x) x = -1;
+        else x = 0;
+
+        if (cameraRelativePos.y > chunkBoundsMax.y) y = -1;
+        else if (cameraRelativePos.y < chunkBoundsMin.y) y = 1;
+        else y = 0;
+
+        Location = new Vector2(x, y);
+    }
+
+    #region private helper methods
+
+    private Vector3 GetCameraExtent()
+    {
+        var camHeight = Camera.main.orthographicSize * 2f;
+        var camWidth = camHeight * Camera.main.aspect;
+        return new Vector3(camWidth / 2, camHeight / 2);
+    }
+    private Vector3 GetChunkBoundsMax(Vector3 cameraExtent)
+    {
+        var spriteMax = CurrentChunk.Sprite.bounds.max;
+        return spriteMax - cameraExtent - CameraMargin;
+    }
+    private Vector3 GetChunkBoundsMin(Vector3 cameraExtent)
+    {
+        var spriteMin = CurrentChunk.Sprite.bounds.min;
+        return spriteMin + cameraExtent + CameraMargin;
     }
 
     private NextWorldChunks GetNextWorldChunks(bool isCorner)
     {
-        Random rand = new Random(Seed);
-        var nextChunks = new NextWorldChunks();
+        var rand = new Random(Seed);
+        var count = NextWorldChunks.Chunks.Count;
         
         if (rand.NextDouble() < ProbabilityOfEventChunk())
         {
-            PreviousWorldChunks.Push(CurrentChunk);
-            nextChunks.Add(EventChunk);
-            if (isCorner)
-            {
-                nextChunks.Add(WorldChunks.Pop());
-                nextChunks.Add(WorldChunks.Pop());
-            }
-            return nextChunks;
+            if (count == 0)
+                NextWorldChunks.Add(EventChunk);
+
+            while (isCorner && count < 3)
+                NextWorldChunks.Add(WorldChunks.Pop());
+
+            return NextWorldChunks;
         }
 
         if (rand.NextDouble() < ProbOfRepeatChunk)
         {
-            nextChunks.Add(CurrentChunk);
-            if (isCorner)
-            {
-                nextChunks.Add(CurrentChunk);
-                nextChunks.Add(CurrentChunk);
-            }
-            return nextChunks;
+            if (count == 0)
+                NextWorldChunks.Add(CurrentChunk);
+
+            while (isCorner && count < 3)
+                NextWorldChunks.Add(CurrentChunk);
+            
+            return NextWorldChunks;
         }
 
         if (rand.NextDouble() < ProbOfPrevChunk)
         {
-            nextChunks.Add(PreviousWorldChunks.Pop());
-            if (isCorner)
-            {
-                nextChunks.Add(PreviousWorldChunks.Pop());
-                nextChunks.Add(PreviousWorldChunks.Pop());
-            }
-            return nextChunks;
+            if (count == 0)
+                NextWorldChunks.Add(PreviousWorldChunks.Pop());
+
+            while (isCorner && count < 3)
+                NextWorldChunks.Add(PreviousWorldChunks.Pop());
+
+            return NextWorldChunks;
         }
 
-        PreviousWorldChunks.Push(CurrentChunk);
-        nextChunks.Add(WorldChunks.Pop());
-        if (isCorner)
-        {
-            nextChunks.Add(WorldChunks.Pop());
-            nextChunks.Add(WorldChunks.Pop());
-        }
-        return nextChunks;
+        if (count == 0)
+            NextWorldChunks.Add(WorldChunks.Pop());
+        while (isCorner && count < 3)
+            NextWorldChunks.Add(WorldChunks.Pop());
+        
+        return NextWorldChunks;
     }
 
-    double ProbabilityOfEventChunk()
+    private WorldChunk ChunkAtPosition(Vector3 pos)
+    {
+        foreach (var chunk in NextWorldChunks.Chunks)
+        {
+            if (chunk != null && chunk.transform.position.Equals(pos))
+            {
+                return chunk;
+            }
+        }
+        return null;
+    }
+
+    private double ProbabilityOfEventChunk()
     {
         return 1 / (1 + Mathf.Exp(-EventChunkSlope * (PreviousWorldChunks.Count - EventChunkMidPoint)));
     }
+
+    #endregion
 }

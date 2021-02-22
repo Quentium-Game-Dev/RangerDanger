@@ -9,14 +9,27 @@ public class NextWorldChunks
 
     public NextWorldChunks()
     {
-        Chunks = new List<WorldChunk>();
+        Chunks = new List<WorldChunk>(3);
+    }
+
+    public int Count()
+    {
+        return Chunks.Count;
     }
 
     public void Add(WorldChunk chunk)
     {
         if (chunk is EventChunk)
-            EventChunkIdx = Chunks.Count;
+            EventChunkIdx = 0;
 
         Chunks.Add(chunk);
+    }
+    public void Remove(int i)
+    {
+        Chunks.RemoveAt(i);
+    }
+    public void Replace(int i, WorldChunk chunk)
+    {
+        Chunks[i] = chunk;
     }
 }

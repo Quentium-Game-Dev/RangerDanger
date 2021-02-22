@@ -4,6 +4,9 @@ using UnityEngine;
 
 public class WorldChunk : MonoBehaviour
 {
+    public delegate void ChunkDestoryDelegate(WorldChunk chunk);
+    public event ChunkDestoryDelegate ChunkDestroyEvent;
+
     // Various example properties for now
     public int Width;
     public int Height;
@@ -14,6 +17,9 @@ public class WorldChunk : MonoBehaviour
 
     public List<Vector2> EnemySpawnPoints;
     public List<GameObject> EnemyPrefabs;
+
+    public bool IsCurrent = false;
+    public int ChunkIndex;
 
     public enum Visibility
     {
@@ -42,6 +48,7 @@ public class WorldChunk : MonoBehaviour
             if (TimePass > 0.5f)
             {
                 ChunkVisibility = Visibility.NotVisible;
+                ChunkDestroyEvent(this);
                 Destroy(gameObject);
             }
         }

@@ -33,6 +33,14 @@ public class @PlayerControls : IInputActionCollection, IDisposable
                     ""expectedControlType"": ""Button"",
                     ""processors"": """",
                     ""interactions"": """"
+                },
+                {
+                    ""name"": ""Sprint"",
+                    ""type"": ""Button"",
+                    ""id"": ""93818ab7-9e0d-4608-8aef-8cf8bbb3e922"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """"
                 }
             ],
             ""bindings"": [
@@ -101,6 +109,17 @@ public class @PlayerControls : IInputActionCollection, IDisposable
                     ""action"": ""UpDown"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""117a4232-8733-4f39-95a1-b9ebd0c40750"",
+                    ""path"": ""<Keyboard>/shift"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Sprint"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         }
@@ -111,6 +130,7 @@ public class @PlayerControls : IInputActionCollection, IDisposable
         m_NormalMovement = asset.FindActionMap("Normal Movement", throwIfNotFound: true);
         m_NormalMovement_LeftRight = m_NormalMovement.FindAction("LeftRight", throwIfNotFound: true);
         m_NormalMovement_UpDown = m_NormalMovement.FindAction("UpDown", throwIfNotFound: true);
+        m_NormalMovement_Sprint = m_NormalMovement.FindAction("Sprint", throwIfNotFound: true);
     }
 
     public void Dispose()
@@ -162,12 +182,14 @@ public class @PlayerControls : IInputActionCollection, IDisposable
     private INormalMovementActions m_NormalMovementActionsCallbackInterface;
     private readonly InputAction m_NormalMovement_LeftRight;
     private readonly InputAction m_NormalMovement_UpDown;
+    private readonly InputAction m_NormalMovement_Sprint;
     public struct NormalMovementActions
     {
         private @PlayerControls m_Wrapper;
         public NormalMovementActions(@PlayerControls wrapper) { m_Wrapper = wrapper; }
         public InputAction @LeftRight => m_Wrapper.m_NormalMovement_LeftRight;
         public InputAction @UpDown => m_Wrapper.m_NormalMovement_UpDown;
+        public InputAction @Sprint => m_Wrapper.m_NormalMovement_Sprint;
         public InputActionMap Get() { return m_Wrapper.m_NormalMovement; }
         public void Enable() { Get().Enable(); }
         public void Disable() { Get().Disable(); }
@@ -183,6 +205,9 @@ public class @PlayerControls : IInputActionCollection, IDisposable
                 @UpDown.started -= m_Wrapper.m_NormalMovementActionsCallbackInterface.OnUpDown;
                 @UpDown.performed -= m_Wrapper.m_NormalMovementActionsCallbackInterface.OnUpDown;
                 @UpDown.canceled -= m_Wrapper.m_NormalMovementActionsCallbackInterface.OnUpDown;
+                @Sprint.started -= m_Wrapper.m_NormalMovementActionsCallbackInterface.OnSprint;
+                @Sprint.performed -= m_Wrapper.m_NormalMovementActionsCallbackInterface.OnSprint;
+                @Sprint.canceled -= m_Wrapper.m_NormalMovementActionsCallbackInterface.OnSprint;
             }
             m_Wrapper.m_NormalMovementActionsCallbackInterface = instance;
             if (instance != null)
@@ -193,6 +218,9 @@ public class @PlayerControls : IInputActionCollection, IDisposable
                 @UpDown.started += instance.OnUpDown;
                 @UpDown.performed += instance.OnUpDown;
                 @UpDown.canceled += instance.OnUpDown;
+                @Sprint.started += instance.OnSprint;
+                @Sprint.performed += instance.OnSprint;
+                @Sprint.canceled += instance.OnSprint;
             }
         }
     }
@@ -201,5 +229,6 @@ public class @PlayerControls : IInputActionCollection, IDisposable
     {
         void OnLeftRight(InputAction.CallbackContext context);
         void OnUpDown(InputAction.CallbackContext context);
+        void OnSprint(InputAction.CallbackContext context);
     }
 }

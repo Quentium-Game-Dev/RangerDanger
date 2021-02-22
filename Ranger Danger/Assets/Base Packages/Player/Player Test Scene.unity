@@ -336,9 +336,16 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   speed: 1.75
-  sprintSpeed: 0
-  sprintDuration: 0
-  sprintTransition: 0
+  sprintSpeed: 2.5
+  accelerationRate: 0.25
+  decelerationRate: 0.25
+  agility: 6.14
+  exhaustionRate: 0.05
+  availableStamina: 1
+  minimumStamina: 0
+  maximumStamina: 8
+  isSprinting: 0
+  state: 0
 --- !u!212 &1305674493
 SpriteRenderer:
   m_ObjectHideFlags: 0

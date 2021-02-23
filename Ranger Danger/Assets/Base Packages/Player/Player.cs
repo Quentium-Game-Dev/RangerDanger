@@ -18,6 +18,7 @@ public class Player : MonoBehaviour
     public float minimumStamina;
     public float maximumStamina = 4.0f;
 
+    private float timer = 0f;
     public float exhaustionTime = 3f;
    
     // Players current position in the game world
@@ -124,20 +125,25 @@ public class Player : MonoBehaviour
     {
         if (isSprinting >= 0.5f && availableStamina <= minimumStamina) // holding shift and lacking stamina
         {
+            timer += Time.fixedDeltaTime;
             state = playerState.Exhausted;
             //minimumStamina = 0.25f * maximumStamina;
         }
 
-        if (isSprinting < 0.5f && availableStamina <= minimumStamina) // not holding shift and lacking stamina
+
+        if (isSprinting < 0.5f && availableStamina <= minimumStamina && timer > exhaustionTime) // not holding shift and lacking stamina
+        {
             state = playerState.Recovering;
+            timer = 0;
+        }
         
         if (isSprinting >= 0.5f && state != playerState.Exhausted) //Holding down Shift
             state = playerState.Sprint;
 
-        if (isSprinting < 0.5f)  //Not holding shift
+        if (isSprinting < 0.5f && state != playerState.Exhausted)  //Not holding shift
             state = playerState.Walk;
 
-        if (leftRightInput == 0 && upDownInput == 0)  //doing nothing
+        if (leftRightInput == 0 && upDownInput == 0 && timer == 0)  //doing nothing
             state = playerState.Idle;
 
         //print(state);

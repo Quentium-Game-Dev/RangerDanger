@@ -8,6 +8,7 @@ public class WorldChunk : MonoBehaviour
     public event ChunkDestoryDelegate ChunkDestroyEvent;
 
     // Various example properties for now
+    public WorldChunk Prefab;
     public int Width;
     public int Height;
     public Sprite Sprite;
@@ -19,7 +20,9 @@ public class WorldChunk : MonoBehaviour
     public List<GameObject> EnemyPrefabs;
 
     public bool IsCurrent = false;
-    public int ChunkIndex;
+    public bool IsExplored = false;
+    public bool IsFirst = false;
+    public int ChunkId;
 
     public enum Visibility
     {
@@ -61,7 +64,7 @@ public class WorldChunk : MonoBehaviour
         {
             if (Camera.current.name != "SceneCamera")
             {
-                print(gameObject.name + " is being rendered by " + Camera.current.name + " at " + Time.time);
+                //print(gameObject.name + " is being rendered by " + Camera.current.name + " at " + Time.time);
                 TimePass = 0.0f;
                 ChunkVisibility = Visibility.Visible;
             }

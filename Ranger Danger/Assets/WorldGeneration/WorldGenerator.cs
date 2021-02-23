@@ -9,14 +9,16 @@ public class WorldGenerator : MonoBehaviour
     public Transform Player;
     public Transform CameraTransform;
 
-    public List<WorldChunk> AllWorldChunks;
-    public Stack<WorldChunk> WorldChunks;
-    public Stack<WorldChunk> PreviousWorldChunks;
+    public List<WorldChunk> WorldChunks;
 
     public WorldChunk FirstChunk;
-    public WorldChunk CurrentChunk;
-    public NextWorldChunks NextWorldChunks;
+    // may potentially become a list
     public EventChunk EventChunk;
+
+    public WorldChunk CurrentChunk;
+
+    public int PreviousChunkId;
+    public Stack<int> ChunksExplored;
 
     public double ProbOfPrevChunk;
     public double ProbOfRepeatChunk;
@@ -29,17 +31,21 @@ public class WorldGenerator : MonoBehaviour
 
     public Vector3 CameraMargin = new Vector3(0.5f, 0.5f);
 
-    public Vector2 PreviousLocation;
-    public Vector2 Location;
-        // -1, 1  NorthEast
-        //  0, 1  North
-        //  1, 1  NorthWest
-        // -1, 0  East
-        //  0, 0  Centre
-        //  1, 0  West
-        // -1,-1  SouthEast
-        //  0,-1  South
-        //  1,-1  SouthWest
+    public Vector2 PlayerLocation;
+    public Vector2 PreviousPlayerLocation;
+    public Vector2 CameraLocation;
+    public Vector2 PreviousCameraLocation;
+    // -1, 1  NorthEast
+    //  0, 1  North
+    //  1, 1  NorthWest
+    // -1, 0  East
+    //  0, 0  Centre
+    //  1, 0  West
+    // -1,-1  SouthEast
+    //  0,-1  South
+    //  1,-1  SouthWest
+
+    private Random Rand;
     
     public enum GenerationState
     {
@@ -56,33 +62,45 @@ public class WorldGenerator : MonoBehaviour
 
     void Initialise()
     {
-        NextWorldChunks = new NextWorldChunks();
-        PreviousWorldChunks = new Stack<WorldChunk>();
-
-        CurrentChunk = InstantiateChunk(FirstChunk, new Vector3(0,0,1));
+        Rand = new Random(Seed);
+        CurrentChunk = InstantiateChunk(FirstChunk, new Vector3(0, 0, 1));
         CurrentChunk.IsCurrent = true;
-        GenerateQueue();
+        CurrentChunk.IsFirst = true;
+
+        ChunksExplored = new Stack<int>();
     }
 
     // Update is called once per frame
     void Update()
     {
+        // checking if CurrentChunk is null, and if so, setting it as the one the player is on
+        // to stop errors later on
+        if (CurrentChunk == null) CurrentChunk = GetChunkAtPosition(Player.position);
+
         CalculatePlayerLocation();
-        if (Location != PreviousLocation && Location != Vector2.zero) //&& State == GenerationState.Clean)
+        CalculateCameraLocation();
+        var cameraChangedLocation = CameraLocation != PreviousCameraLocation;
+
+        var playerChangedLocation = PlayerLocation != PreviousPlayerLocation;
+        var changedChunk = 
+            playerChangedLocation &&
+            ((PlayerLocation.x == -PreviousPlayerLocation.x && PlayerLocation.x != 0 && PreviousPlayerLocation.x != 0) ||
+            (PlayerLocation.y == -PreviousPlayerLocation.y && PlayerLocation.y != 0 && PreviousPlayerLocation.y != 0));
+        var movedToCentre =
+            playerChangedLocation && PlayerLocation == Vector2.zero;
+
+        if (cameraChangedLocation && !changedChunk && CameraLocation != Vector2.zero) //&& State == GenerationState.Clean)
         {
             CreateNextWorldChunks();
             State = GenerationState.HasGenerated;
         }
-    }
-
-    void GenerateQueue()
-    {
-        var rand = new Random(Seed);
-        WorldChunks = new Stack<WorldChunk>();
-
-        for (int i = 0; i < StackSize; i++)
+        if (movedToCentre && CurrentChunk != FirstChunk)
         {
-            WorldChunks.Push(AllWorldChunks[rand.Next(AllWorldChunks.Count)]);
+            CurrentChunk.IsExplored = true;
+        }
+        if (changedChunk)
+        {
+            CurrentChunk = GetChunkAtPosition(Player.position);
         }
     }
 
@@ -90,197 +108,162 @@ public class WorldGenerator : MonoBehaviour
     void CreateNextWorldChunks()
     {
         // if sum of mod(x) and mod(y) is 2, its a corner
-        var isCorner = Mathf.Abs(Location.x) + Mathf.Abs(Location.y) == 2;
-        GenerateNextWorldChunks(isCorner);
+        var isCorner = Mathf.Abs(CameraLocation.x) + Mathf.Abs(CameraLocation.y) == 2;
 
-        var position = CurrentChunk.transform.position + new Vector3(CurrentChunk.Width * Location.x, CurrentChunk.Height * Location.y);
+        var position = CurrentChunk.transform.position + new Vector3(CurrentChunk.Width * CameraLocation.x, CurrentChunk.Height * CameraLocation.y);
         // Instantiating chunk adjacent to location, if one isn't already there
-        CreateChunk(position, isCorner);
+        var nextChunkId = GetNextChunkId();
+        if (nextChunkId == -1) CreateChunk(position, nextChunkId, EventChunk);
+        else if (CreateChunk(position, nextChunkId) && isCorner) nextChunkId = GetNextChunkId();
 
         // Instantiating edge chunks, if location is in corner
         if (isCorner)
         {
-            position = CurrentChunk.transform.position + new Vector3(CurrentChunk.Width * Location.x, 0);
-            CreateChunk(position, isCorner);
+            position = CurrentChunk.transform.position + new Vector3(CurrentChunk.Width * CameraLocation.x, 0);
+            if (nextChunkId == -1) CreateChunk(position, nextChunkId, EventChunk);
+            else if (CreateChunk(position, nextChunkId)) nextChunkId = GetNextChunkId();
 
-            position = CurrentChunk.transform.position + new Vector3(0, CurrentChunk.Height * Location.y);
-            CreateChunk(position, isCorner);
+            position = CurrentChunk.transform.position + new Vector3(0, CurrentChunk.Height * CameraLocation.y);
+            if (nextChunkId == -1) CreateChunk(position, nextChunkId, EventChunk);
+            else CreateChunk(position, nextChunkId);
         }
     }
 
     void CalculatePlayerLocation()
     {
-        PreviousLocation = Location;
+        PreviousPlayerLocation = PlayerLocation;
+        var playerRelativePos = GetPlayerRelativePosition(new Vector3(10, 10), new Vector3(-10, -10));
 
-        var cameraExtent = GetCameraExtent();
-        var chunkBoundsMax = GetChunkBoundsMax(cameraExtent);
-        var chunkBoundsMin = GetChunkBoundsMin(cameraExtent);
+        PlayerLocation = GetLocation(playerRelativePos, Vector3.zero);
+    }
 
+    void CalculateCameraLocation()
+    {
+        PreviousCameraLocation = CameraLocation;
         var cameraRelativePos = CameraTransform.InverseTransformPoint(CurrentChunk.transform.position);
+
+        CameraLocation = GetLocation(cameraRelativePos, CameraMargin);
+    }
+
+    #region private helper methods
+
+    private Vector3 GetLocation(Vector3 relativePosition, Vector3 margin)
+    {
+        var cameraExtent = GetCameraExtent();
+        var chunkBoundsMax = GetChunkBoundsMax(cameraExtent, margin);
+        var chunkBoundsMin = GetChunkBoundsMin(cameraExtent, margin);
 
         int x;
         int y;
 
-        if (cameraRelativePos.x < chunkBoundsMin.x) x = 1;
-        else if (cameraRelativePos.x > chunkBoundsMax.x) x = -1;
+        if (relativePosition.x < chunkBoundsMin.x) x = 1;
+        else if (relativePosition.x > chunkBoundsMax.x) x = -1;
         else x = 0;
 
-        if (cameraRelativePos.y > chunkBoundsMax.y) y = -1;
-        else if (cameraRelativePos.y < chunkBoundsMin.y) y = 1;
+        if (relativePosition.y > chunkBoundsMax.y) y = -1;
+        else if (relativePosition.y < chunkBoundsMin.y) y = 1;
         else y = 0;
 
-        Location = new Vector2(x, y);
+        return new Vector2(x, y);
     }
 
-    #region private helper methods
-    // Instantiates a chunk and returns the created one
-    private void CreateChunk(Vector3 position, bool isCorner)
+    // Tries to Instantiate a chunk, and returns true if it was successful
+    private bool CreateChunk(Vector3 position, int chunkId = -1, WorldChunk specificPrefab = null)
     {
-        var chunkIndex = 0;
-        var max = isCorner ? 3 : 1;
-        WorldChunk prefab = null;
+        var chunkAtPosition = GetChunkAtPosition(position - new Vector3(0, 0, 1));
+        if (chunkAtPosition != null) return false;
 
-        while (chunkIndex < max)
-        {
-            prefab = NextWorldChunks.Chunks[chunkIndex];
-            // If its a prefab, use it
-            if (prefab.gameObject != null && !prefab.gameObject.activeInHierarchy) break;
-
-            chunkIndex++;
-            if (chunkIndex == max) return;
-        }
-        prefab.ChunkIndex = chunkIndex;
-
-        var chunkAtPosition = ChunkAtPosition(position);
-        if (chunkAtPosition == null)
-        {
-            var chunk = InstantiateChunk(prefab, position);
-            NextWorldChunks.Replace(chunkIndex, chunk);
-        }
-        else
-        {
-            //NextWorldChunks.Replace(chunkIndex, chunkAtPosition);
-        }
+        WorldChunk prefab;
+        if (chunkId == -1 && specificPrefab != null) prefab = specificPrefab;
+        else prefab = WorldChunks[chunkId];
+        
+        InstantiateChunk(prefab, position, chunkId);
+        return true;
     }
-    private WorldChunk InstantiateChunk(WorldChunk prefab, Vector3 position)
+    private WorldChunk InstantiateChunk(WorldChunk prefab, Vector3 position, int chunkId = -1)
     {
         var chunk = Instantiate(
                 prefab,
                 position,
-                Quaternion.identity);
+                prefab.transform.rotation);
         chunk.ChunkDestroyEvent += OnChunkDestroy;
-        chunk.ChunkIndex = prefab.ChunkIndex;
+        chunk.ChunkId = chunkId;
 
         return chunk;
     }
-
     private void OnChunkDestroy(WorldChunk chunk)
     {
-        // If the current chunk is destroyed, pick the one the player is standing on to be the next chunk
-        if (chunk.IsCurrent)
-        {
-            foreach (var c in NextWorldChunks.Chunks)
-            {
-                if (c != null && c.IsPositionInChunk(Player.position))
-                {
-                    CurrentChunk = c;
-                    c.IsCurrent = true;
-                    NextWorldChunks.Remove(c.ChunkIndex);
-                    State = GenerationState.Clean;
-                    break;
-                }
-            }
-            ResetChunkIndex();
-        }
-        // Else remove it from the next chunks, add it back to the stack
-        // as this would only happen if the player didn't actually explore the chunk,
-        // just skirted the edge
-        // TODO: this adds a null thing as its been destroyed, would be nice to eventually
-        // recycle unused world chunks
-        else
-        {
-            NextWorldChunks.Remove(chunk.ChunkIndex);
-            //WorldChunks.Push(chunk);
-
-            // Resetting chunk index
-            ResetChunkIndex();
-            State = GenerationState.Clean;
-        }
+        if (chunk.IsExplored)
+            ChunksExplored.Push(chunk.ChunkId);
     }
-
-    private void ResetChunkIndex()
-    {
-        for (var i = 0; i < NextWorldChunks.Count(); i++)
-        {
-            NextWorldChunks.Chunks[i].ChunkIndex = i;
-        }
-    }
-
     private Vector3 GetCameraExtent()
     {
         var camHeight = Camera.main.orthographicSize * 2f;
         var camWidth = camHeight * Camera.main.aspect;
         return new Vector3(camWidth / 2, camHeight / 2);
     }
-    private Vector3 GetChunkBoundsMax(Vector3 cameraExtent)
+    private Vector3 GetChunkBoundsMax(Vector3 cameraExtent, Vector3 margin)
     {
         var spriteMax = CurrentChunk.Sprite.bounds.max;
-        return spriteMax - cameraExtent - CameraMargin;
+        return spriteMax - cameraExtent - margin;
     }
-    private Vector3 GetChunkBoundsMin(Vector3 cameraExtent)
+    private Vector3 GetChunkBoundsMin(Vector3 cameraExtent, Vector3 margin)
     {
         var spriteMin = CurrentChunk.Sprite.bounds.min;
-        return spriteMin + cameraExtent + CameraMargin;
+        return spriteMin + cameraExtent + margin;
     }
 
-    private void GenerateNextWorldChunks(bool isCorner)
+    private Vector3 GetPlayerRelativePosition(Vector3 boundsMax, Vector3 boundsMin)
     {
-        var rand = new Random(Seed);
+        var rel = CameraTransform.InverseTransformPoint(CurrentChunk.transform.position);
+        if (rel.x > boundsMax.x) rel.x -= 20;
+        if (rel.x < boundsMin.x) rel.x += 20;
+        if (rel.y > boundsMax.y) rel.y -= 20;
+        if (rel.y < boundsMin.y) rel.y += 20;
 
-        WorldChunk specificChunk = null;
-        if (rand.NextDouble() < ProbabilityOfEventChunk())
-        {
-            specificChunk = EventChunk;
-        }
-
-        if (rand.NextDouble() < ProbOfRepeatChunk)
-        {
-            specificChunk = CurrentChunk;
-        }
-
-        if (rand.NextDouble() < ProbOfPrevChunk)
-        {
-            specificChunk = PreviousWorldChunks.Pop();
-        }
-
-        PopulateNextWorldChunks(specificChunk, isCorner);
-    }
-    private void PopulateNextWorldChunks(WorldChunk chunk, bool isCorner)
-    {
-        var max = isCorner ? 3 : 1;
-        var i = NextWorldChunks.Count();
-        while (NextWorldChunks.Count() < max)
-        {
-            NextWorldChunks.Add(chunk ?? WorldChunks.Pop());
-            i++;
-        }
+        return rel;
     }
 
-    private WorldChunk ChunkAtPosition(Vector3 pos)
+    private int GetNextChunkId()
     {
-        foreach (var chunk in NextWorldChunks.Chunks)
+        if (Rand.NextDouble() < ProbabilityOfEventChunk())
         {
-            if (chunk != null && chunk.gameObject != null && chunk.gameObject.activeInHierarchy && chunk.transform.position.Equals(pos))
-            {
-                return chunk;
-            }
+            print("Using event chunk");
+            return -1;
         }
+
+        if (Rand.NextDouble() < ProbOfRepeatChunk && !CurrentChunk.IsFirst)
+        {
+            print("Using current chunk");
+            return CurrentChunk.ChunkId;
+        }
+
+        if (Rand.NextDouble() < ProbOfPrevChunk && ChunksExplored.Count > 0)
+        {
+            print("Using previous chunk");
+            return ChunksExplored.Pop();
+        }
+        
+        var nextId = Rand.Next(WorldChunks.Count);
+        //print(nextId);
+        return nextId;
+    }
+    
+    private WorldChunk GetChunkAtPosition(Vector3 pos)
+    {
+        RaycastHit[] hits;
+        hits = Physics.RaycastAll(pos, Vector3.forward, 1f);
+        Debug.DrawRay(pos, Vector3.forward, Color.red, 100);
+
+        if (hits != null && hits.Length > 0 && hits[0].collider.gameObject.layer == LayerMask.NameToLayer("Ground"))
+            return hits[0].collider.GetComponent<WorldChunk>();
+
         return null;
     }
 
     private double ProbabilityOfEventChunk()
     {
-        return 1 / (1 + Mathf.Exp(-EventChunkSlope * (PreviousWorldChunks.Count - EventChunkMidPoint)));
+        return 1 / (1 + Mathf.Exp(-EventChunkSlope * (ChunksExplored.Count - EventChunkMidPoint)));
     }
 
     #endregion

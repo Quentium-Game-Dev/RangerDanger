@@ -314,21 +314,28 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   Player: {fileID: 1305674494}
   CameraTransform: {fileID: 1532934687}
-  AllWorldChunks:
+  WorldChunks:
+  - {fileID: 4563120391317913892, guid: 030b780f5d11b2e4fa3c691dd57ca59d, type: 3}
   - {fileID: 4745635584703344589, guid: c9d418d22baec094c83143d713b7cf09, type: 3}
+  - {fileID: 7363516709102429513, guid: 5a4714c0c843c3049baf286b4e836b66, type: 3}
+  - {fileID: 5137326553363347050, guid: 2793a1413b2abd24ebde6f43a032f7ca, type: 3}
   FirstChunk: {fileID: 4745635584703344589, guid: c9d418d22baec094c83143d713b7cf09,
     type: 3}
+  EventChunk: {fileID: 3701034115749362177, guid: 80a5fbe21c554bf4ca6752fc90f1cc8b,
+    type: 3}
   CurrentChunk: {fileID: 0}
-  EventChunk: {fileID: 0}
-  ProbOfPrevChunk: 0.5
-  ProbOfRepeatChunk: 0.5
+  PreviousChunkId: 0
+  ProbOfPrevChunk: 0
+  ProbOfRepeatChunk: 0
   EventChunkSlope: 0.75
-  EventChunkMidPoint: 20
+  EventChunkMidPoint: 2
   Seed: 0
   StackSize: 20
   CameraMargin: {x: 0.5, y: 0.5, z: 0}
-  PreviousLocation: {x: 0, y: 0}
-  Location: {x: 0, y: 0}
+  PlayerLocation: {x: 0, y: 0}
+  PreviousPlayerLocation: {x: 0, y: 0}
+  CameraLocation: {x: 0, y: 0}
+  PreviousCameraLocation: {x: 0, y: 0}
   State: 0
 --- !u!4 &960309252
 Transform:

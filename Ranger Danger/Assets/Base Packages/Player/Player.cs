@@ -17,6 +17,8 @@ public class Player : MonoBehaviour
     public float availableStamina = 4.0f;
     public float minimumStamina;
     public float maximumStamina = 4.0f;
+
+    public float exhaustionTime = 3f;
    
     // Players current position in the game world
     private Vector2 currentPosition;
@@ -78,28 +80,32 @@ public class Player : MonoBehaviour
         //if the player is holding shift, not tired and has stamina they can sprint
         if (state == playerState.Sprint)
         {
-            //If the players stamina nears depleation and they are still sprinting
-            if (state == playerState.Exhausted)
-            {
-                availableStamina = 0.01f;
-                speed = Mathf.Lerp(speed, normalSpeed, decelerationRate);
-            }
-            speed = Mathf.Lerp(speed, sprintSpeed, accelerationRate);     //Over time increase sprinting speed
-            availableStamina -= exhaustionRate;                         //Over time decrease stamina.
+            speed = Mathf.Lerp(speed, sprintSpeed, accelerationRate * Time.fixedDeltaTime);     //Over time increase sprinting speed
+            availableStamina -= exhaustionRate * Time.fixedDeltaTime;     //Over time decrease stamina.
         }
 
-    //    if (isExhausted == true && isSprinting >= 0.5f)
-     //   {
-      //      availableStamina = Mathf.Lerp(availableStamina, maximumStamina, exhaustionRate);
+        //    if (isExhausted == true && isSprinting >= 0.5f)
+        //   {
+        //      availableStamina = Mathf.Lerp(availableStamina, maximumStamina, exhaustionRate);
 
-      //  }
+        //  }
 
-        if(isSprinting <= 0.5f)
+
+        if (state == playerState.Recovering || state == playerState.Walk || state == playerState.Idle)
         {
-            availableStamina = Mathf.Lerp(availableStamina, maximumStamina, agility);
-            speed = Mathf.Lerp(speed,normalSpeed, decelerationRate);
+            availableStamina = Mathf.Lerp(availableStamina, maximumStamina, agility * Time.fixedDeltaTime);
         }
-            
+
+        //If the player is exhausted and they are still sprinting
+        if (state == playerState.Exhausted || state == playerState.Walk)
+        {
+            speed = Mathf.Lerp(speed, normalSpeed, decelerationRate * Time.fixedDeltaTime);
+        }
+        if (state == playerState.Idle)
+        {
+            speed = Mathf.Lerp(speed, 0, decelerationRate * Time.fixedDeltaTime);
+        }
+
         currentPosition.x += leftRightInput * speed * Time.fixedDeltaTime;
 
         currentPosition.y += upDownInput * speed * Time.fixedDeltaTime;
@@ -116,17 +122,25 @@ public class Player : MonoBehaviour
 
     public void GetPlayerState()
     {
-        if(isSprinting >= 0.5f) //Holding down Shift
+        if (isSprinting >= 0.5f && availableStamina <= minimumStamina) // holding shift and lacking stamina
+        {
+            state = playerState.Exhausted;
+            //minimumStamina = 0.25f * maximumStamina;
+        }
+
+        if (isSprinting < 0.5f && availableStamina <= minimumStamina) // not holding shift and lacking stamina
+            state = playerState.Recovering;
+        
+        if (isSprinting >= 0.5f && state != playerState.Exhausted) //Holding down Shift
             state = playerState.Sprint;
 
         if (isSprinting < 0.5f)  //Not holding shift
             state = playerState.Walk;
 
-        if (isSprinting >= 0.5f && availableStamina <= minimumStamina) //holding shift but lacking stamina
-            state = playerState.Exhausted;
-
-        if(leftRightInput + upDownInput == 0)  //doing nothing
+        if (leftRightInput == 0 && upDownInput == 0)  //doing nothing
             state = playerState.Idle;
+
+        //print(state);
     }
 
     public void ReadInputs()

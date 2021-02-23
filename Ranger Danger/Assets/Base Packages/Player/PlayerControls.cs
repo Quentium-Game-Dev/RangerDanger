@@ -37,7 +37,7 @@ public class @PlayerControls : IInputActionCollection, IDisposable
                 {
                     ""name"": ""Sprint"",
                     ""type"": ""Button"",
-                    ""id"": ""93818ab7-9e0d-4608-8aef-8cf8bbb3e922"",
+                    ""id"": ""b044234d-4d7c-4ae0-9fdb-c01866d6b1c5"",
                     ""expectedControlType"": ""Button"",
                     ""processors"": """",
                     ""interactions"": """"
@@ -112,8 +112,8 @@ public class @PlayerControls : IInputActionCollection, IDisposable
                 },
                 {
                     ""name"": """",
-                    ""id"": ""117a4232-8733-4f39-95a1-b9ebd0c40750"",
-                    ""path"": ""<Keyboard>/shift"",
+                    ""id"": ""05dd4fff-e3ff-4c3f-aa8d-e6a83a4eb718"",
+                    ""path"": ""<Keyboard>/leftShift"",
                     ""interactions"": """",
                     ""processors"": """",
                     ""groups"": """",

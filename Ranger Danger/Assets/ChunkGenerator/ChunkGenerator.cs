@@ -1,106 +1,90 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using Random = System.Random;
 
 public class ChunkGenerator : MonoBehaviour
 {
     public int seed;
-    // Width and height of the texture in pixels.
-    public int pixWidth;
-    public int pixHeight;
+    // Used for custom noise function
+    [Range(8, 1024)]
+    public int resolution;
+    public float frequency = 1f;
 
-    // The origin of the sampled area in the plane.
-    public float xOrigin;
-    public float yOrigin;
-    public int xMaxOrigin = 1023;
-    public int yMaxOrigin = 1023;
-    [Range(0, 10)]
-    public int density;
-
-    // The number of cycles of the basic noise pattern that are repeated
-    // over the width and height of the texture.
-    public float scale = 1.0F;
-
-    public bool randomiseOrigin;
     public bool randomiseSeed;
+    public bool randomiseHash;
 
-    public enum Type
-    {
-        Perlin,
-        Blue
-    }
-    public Type noiseType;
+    public NoiseMethodType type;
+    public bool useFractal;
+    [Range(1, 8)]
+    public int octaves;
+    [Range(1f, 4f)]
+    public float lacunarity = 2f;
+    [Range(0f, 1f)]
+    public float persistence = 0.5f;
 
-    public Vector3 displacement = new Vector3(-10, -10);
+    // Dimensions for noise
+    [Range(1, 3)]
+    public int dimensions = 3;
 
     // Renderer to visualise the noise
-    public Renderer rend;
+    public Transform noiseRenderer;
 
-    public GameObject treePrefab;
-    public Transform treeContainer;
+    public Vector3 displacement = new Vector3(20, 20);
+
+    public bool generateTrees;
+    [Range(0f, 1f)]
     public float treeFloat;
+    public GameObject[] treePrefabs;
+    public Transform treeContainer;
+
+    public bool generateRocks;
+    [Range(0f, 1f)]
+    public float rockFloat;
+    public GameObject rockPrefab;
+    public Transform rockContainer;
 
     private Texture2D noiseTex;
-    private Color[] pix;
-    private Random rand;
 
     void Start()
     {
+        if (randomiseHash)
+            Noise.RandomiseHash();
         if (randomiseSeed)
         {
-            rand = new Random((int)System.DateTime.UtcNow.ToBinary());
+            Random.InitState((int)System.DateTime.UtcNow.ToBinary());
         }
         else
         {
-            rand = new Random(seed);
+            Random.InitState(seed);
         }
 
-        if (randomiseOrigin)
-        {
-            xOrigin = rand.Next(xMaxOrigin);
-            yOrigin = rand.Next(yMaxOrigin);
-        }
-        // Set up the texture and a Color array to hold pixels during processing.
-        noiseTex = new Texture2D(pixWidth, pixHeight);
-        pix = new Color[noiseTex.width * noiseTex.height];
-        rend.material.mainTexture = noiseTex;
-
-        if (noiseType == Type.Perlin) GeneratePerlinNoise();
-        else if (noiseType == Type.Blue) GenerateBlueNoise();
+        Generate();
     }
 
-    public void GeneratePerlinNoise()
+    void Update()
     {
-        // For each pixel in the texture...
-        float y = 0.0F;
-
-        while (y < noiseTex.height)
+        if (noiseRenderer.hasChanged)
         {
-            float x = 0.0F;
-            while (x < noiseTex.width)
-            {
-                float xCoord = xOrigin + x / noiseTex.width * scale;
-                float yCoord = yOrigin + y / noiseTex.height * scale;
-                float sample = Mathf.PerlinNoise(xCoord, yCoord);
-
-                var divs = 1;// rand.Next(3, 10);
-                if (y % divs == 0 && x % divs == 0)
-                {
-                    if (sample > treeFloat) Instantiate(treePrefab, new Vector3(x / 10, y / 10), transform.rotation, transform);
-                }
-                pix[(int)y * noiseTex.width + (int)x] = new Color(sample, sample, sample);
-                x++;
-            }
-            y++;
+            noiseRenderer.hasChanged = false;
+            Generate();
         }
-
-        // Copy the pixel data to the texture and load it into the GPU.
-        noiseTex.SetPixels(pix);
-        noiseTex.Apply();
     }
 
-    void GenerateBlueNoise()
+    public void Generate()
+    {
+        if (noiseTex == null)
+        {
+            noiseTex = new Texture2D(resolution, resolution, TextureFormat.RGB24, true);
+            noiseTex.name = "Procedural Texture";
+            noiseTex.wrapMode = TextureWrapMode.Clamp;
+            noiseTex.filterMode = FilterMode.Trilinear;
+            noiseTex.anisoLevel = 9;
+            noiseRenderer.GetComponent<MeshRenderer>().material.mainTexture = noiseTex;
+        }
+        GenerateNoise();
+    }
+
+    public void GenerateNoise()
     {
         if (treeContainer.childCount > 0)
         {
@@ -109,61 +93,53 @@ public class ChunkGenerator : MonoBehaviour
                 Destroy(child.gameObject);
             }
         }
-
-        float[,] bluenoise = new float[pixWidth, pixHeight];
-        // For each pixel in the texture...
-        float y = 0.0F;
-
-
-        while (y < noiseTex.height)
+        if (rockContainer.childCount > 0)
         {
-            float x = 0.0F;
-            while (x < noiseTex.width)
+            foreach (Transform child in rockContainer)
             {
-                float nx = x / noiseTex.width - 0.5f;
-                float ny = y / noiseTex.height - 0.5f;
-                var sample = bluenoise[(int)x,(int)y] = (float)rand.NextDouble();
-
-                /*
-                var divs = 1;// rand.Next(3, 10);
-                if (y % divs == 0 && x % divs == 0)
-                {
-                    if (sample > treeFloat) Instantiate(treePrefab, new Vector3(x / 10, y / 10), transform.rotation, transform);
-                }
-                */
-                pix[(int)y * noiseTex.width + (int)x] = new Color(sample, sample, sample);
-                x++;
+                Destroy(child.gameObject);
             }
-            y++;
         }
 
-        for (int yc = 0; yc < pixHeight; yc++)
+        if (noiseTex.width != resolution || noiseTex.height != resolution)
         {
-            for (int xc = 0; xc < pixWidth; xc++)
+            noiseTex.Resize(resolution, resolution);
+        }
+
+        NoiseMethod method = Noise.noiseMethods[(int)type][dimensions - 1];
+        var stepSize = 1f / resolution;
+
+        // Corners of the texture
+        Vector3 point00 = noiseRenderer.TransformPoint(new Vector3(-0.5f, -0.5f));
+        Vector3 point10 = noiseRenderer.TransformPoint(new Vector3(0.5f, -0.5f));
+        Vector3 point01 = noiseRenderer.TransformPoint(new Vector3(-0.5f, 0.5f));
+        Vector3 point11 = noiseRenderer.TransformPoint(new Vector3(0.5f, 0.5f));
+
+        for (int y = 0; y < resolution; y++)
+        {
+            Vector3 point0 = Vector3.Lerp(point00, point01, (y + 0.5f) * stepSize);
+            Vector3 point1 = Vector3.Lerp(point10, point11, (y + 0.5f) * stepSize);
+            for (int x = 0; x < resolution; x++)
             {
-                double max = 0;
-                // there are more efficient algorithms than this
-                for (int yn = yc - density; yn <= yc + density; yn++)
-                {
-                    for (int xn = xc - density; xn <= xc + density; xn++)
-                    {
-                        if (0 <= yn && yn < pixHeight && 0 <= xn && xn < pixWidth)
-                        {
-                            double e = bluenoise[yn,xn];
-                            if (e > max) { max = e; }
-                        }
-                    }
-                }
-                if (bluenoise[yc,xc] == max)
-                {
-                    // place tree at xc,yc
-                    Instantiate(treePrefab, new Vector3(xc, yc) + displacement, transform.rotation, treeContainer);
-                }
+                Vector3 point = Vector3.Lerp(point0, point1, (x + 0.5f) * stepSize);
+                float sample = 
+                    useFractal ? 
+                        Noise.Sum(method, point, frequency, octaves, lacunarity, persistence) : 
+                        method(point, frequency);
+
+                if (type != NoiseMethodType.Value)
+                    sample = sample * 0.5f + 0.5f;
+
+                noiseTex.SetPixel(x, y, Color.white * sample);
+                // place tree at point if greater than tree float
+                if (generateTrees && sample < treeFloat)    
+                    Instantiate(treePrefabs[Random.Range(0, treePrefabs.Length)], new Vector3(point.x * displacement.x, point.y * displacement.y, 0) + new Vector3(Random.value, Random.value) * 0.5f - point11, transform.rotation, treeContainer);
+                if (generateRocks && sample > (1 - rockFloat))
+                    Instantiate(rockPrefab, new Vector3(point.x * displacement.x, point.y * displacement.y, 0) + new Vector3(Random.value, Random.value) * 0.5f - point11, transform.rotation, rockContainer);
             }
         }
 
         // Copy the pixel data to the texture and load it into the GPU.
-        noiseTex.SetPixels(pix);
         noiseTex.Apply();
     }
 

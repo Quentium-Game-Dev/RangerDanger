@@ -1,6 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 
 public class ChunkGenerator : MonoBehaviour
 {
@@ -26,6 +24,8 @@ public class ChunkGenerator : MonoBehaviour
     [Range(1, 3)]
     public int dimensions = 3;
 
+    public float scale = 1f;
+
     // Renderer to visualise the noise
     public Transform noiseRenderer;
 
@@ -34,19 +34,33 @@ public class ChunkGenerator : MonoBehaviour
     public bool generateTrees;
     [Range(0f, 1f)]
     public float treeFloat;
+    // trees per quadrant row/column
+    // more than 16 is just nuts
+    [Range(0, 16)]
+    public int treeDensity;
     public GameObject[] treePrefabs;
     public Transform treeContainer;
+    private bool trees;
 
     public bool generateRocks;
     [Range(0f, 1f)]
     public float rockFloat;
-    public GameObject rockPrefab;
+    [Range(0, 16)]
+    public int rockDensity;
+    public GameObject[] rockPrefabs;
     public Transform rockContainer;
+    private bool rocks;
+
+    public Gradient colouring;
 
     private Texture2D noiseTex;
+    private Sprite sprite;
 
     void Start()
     {
+        trees = generateTrees && treeDensity != 0;
+        rocks = generateRocks && rockDensity != 0;
+
         if (randomiseHash)
             Noise.RandomiseHash();
         if (randomiseSeed)
@@ -81,6 +95,7 @@ public class ChunkGenerator : MonoBehaviour
             noiseTex.anisoLevel = 9;
             noiseRenderer.GetComponent<MeshRenderer>().material.mainTexture = noiseTex;
         }
+
         GenerateNoise();
     }
 
@@ -101,19 +116,27 @@ public class ChunkGenerator : MonoBehaviour
             }
         }
 
-        if (noiseTex.width != resolution || noiseTex.height != resolution)
+        int treePos = 0;
+        int rockPos = 0;
+        if (trees)
         {
-            noiseTex.Resize(resolution, resolution);
+            var treeQuadrant = resolution / treeDensity;
+            treePos = (int)(0.5f * treeQuadrant);
+        }
+        if (rocks)
+        {
+            var rockQuadrant = resolution / treeDensity;
+            rockPos = (int)(0.5f * rockQuadrant);
         }
 
         NoiseMethod method = Noise.noiseMethods[(int)type][dimensions - 1];
         var stepSize = 1f / resolution;
 
         // Corners of the texture
-        Vector3 point00 = noiseRenderer.TransformPoint(new Vector3(-0.5f, -0.5f));
-        Vector3 point10 = noiseRenderer.TransformPoint(new Vector3(0.5f, -0.5f));
-        Vector3 point01 = noiseRenderer.TransformPoint(new Vector3(-0.5f, 0.5f));
-        Vector3 point11 = noiseRenderer.TransformPoint(new Vector3(0.5f, 0.5f));
+        Vector3 point00 = noiseRenderer.TransformPoint(new Vector3(-0.5f, -0.5f)) / scale;
+        Vector3 point10 = noiseRenderer.TransformPoint(new Vector3(0.5f, -0.5f)) / scale;
+        Vector3 point01 = noiseRenderer.TransformPoint(new Vector3(-0.5f, 0.5f)) / scale;
+        Vector3 point11 = noiseRenderer.TransformPoint(new Vector3(0.5f, 0.5f)) / scale;
 
         for (int y = 0; y < resolution; y++)
         {
@@ -124,18 +147,31 @@ public class ChunkGenerator : MonoBehaviour
                 Vector3 point = Vector3.Lerp(point0, point1, (x + 0.5f) * stepSize);
                 float sample = 
                     useFractal ? 
-                        Noise.Sum(method, point, frequency, octaves, lacunarity, persistence) : 
-                        method(point, frequency);
+                        Noise.Sum(method, point, frequency, octaves, lacunarity, persistence).value : 
+                        method(point, frequency).value;
 
-                if (type != NoiseMethodType.Value)
-                    sample = sample * 0.5f + 0.5f;
+                sample = sample * 0.5f + 0.5f;
 
-                noiseTex.SetPixel(x, y, Color.white * sample);
-                // place tree at point if greater than tree float
-                if (generateTrees && sample < treeFloat)    
-                    Instantiate(treePrefabs[Random.Range(0, treePrefabs.Length)], new Vector3(point.x * displacement.x, point.y * displacement.y, 0) + new Vector3(Random.value, Random.value) * 0.5f - point11, transform.rotation, treeContainer);
-                if (generateRocks && sample > (1 - rockFloat))
-                    Instantiate(rockPrefab, new Vector3(point.x * displacement.x, point.y * displacement.y, 0) + new Vector3(Random.value, Random.value) * 0.5f - point11, transform.rotation, rockContainer);
+                noiseTex.SetPixel(x, y, colouring.Evaluate(sample));
+                if (trees && x % treePos == 0 && y % treePos == 0)
+                {
+                    // place tree at point if greater than tree float
+                    if (sample < treeFloat)
+                    {
+                        var treePoint = point * scale;
+                        var prefab = treePrefabs[Random.Range(0, treePrefabs.Length)];
+                        Instantiate(prefab, treePoint + (1f / (4f * treeDensity)) * new Vector3(1, 1) * transform.localScale.x + (new Vector3(Random.value, Random.value) - new Vector3(1f, 1f)) * (8f / treeDensity), transform.rotation, treeContainer);
+                    }
+                }
+                if (rocks && x % rockPos == 0 && y % rockPos == 0)
+                {
+                    if (sample > (1 - rockFloat))
+                    {
+                        var rockPoint = point * scale;
+                        var prefab = rockPrefabs[Random.Range(0, rockPrefabs.Length)];
+                        Instantiate(prefab, rockPoint + (1f / (4f * rockDensity)) * new Vector3(1, 1) * transform.localScale.x + (new Vector3(Random.value, Random.value) - new Vector3(1f, 1f)) * (8f / rockDensity), transform.rotation, rockContainer);
+                    }
+                }
             }
         }
 

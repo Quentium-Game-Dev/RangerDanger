@@ -6,6 +6,7 @@ using System.Linq;
 public delegate NoiseSample NoiseMethod(Vector3 point, float frequency);
 public enum NoiseMethodType
 { 
+	None,
 	Value,
 	Perlin,
 	SimplexValue,
@@ -14,6 +15,12 @@ public enum NoiseMethodType
 
 public static class Noise
 {
+	public static NoiseMethod[] noneMethods =
+{
+		None1D,
+		None2D,
+		None3D
+	};
 	public static NoiseMethod[] valueMethods =
 	{
 		Value1D,
@@ -40,6 +47,7 @@ public static class Noise
 	};
 	public static NoiseMethod[][] noiseMethods =
 	{
+		noneMethods,
 		valueMethods,
 		perlinMethods,
 		simplexValueMethods,
@@ -209,8 +217,29 @@ public static class Noise
 
 	private static float sqrt2 = Mathf.Sqrt(2f);
 
-    #region Value methods
-    public static NoiseSample Value1D(Vector3 point, float frequency)
+    #region None methods
+	public static NoiseSample None1D(Vector3 point, float frequency)
+    {
+		NoiseSample sample = new NoiseSample();
+		sample.value = 1f;
+		return sample;
+    }
+	public static NoiseSample None2D(Vector3 point, float frequency)
+	{
+		NoiseSample sample = new NoiseSample();
+		sample.value = 1f;
+		return sample;
+	}
+	public static NoiseSample None3D(Vector3 point, float frequency)
+	{
+		NoiseSample sample = new NoiseSample();
+		sample.value = 1f;
+		return sample;
+	}
+	#endregion
+
+	#region Value methods
+	public static NoiseSample Value1D(Vector3 point, float frequency)
 	{
 		point *= frequency;
 		int i0 = Mathf.FloorToInt(point.x);

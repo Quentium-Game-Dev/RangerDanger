@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System.Collections.Generic;
+using UnityEngine;
 
 public class ChunkGenerator : MonoBehaviour
 {
@@ -33,7 +34,7 @@ public class ChunkGenerator : MonoBehaviour
 
     public bool generateTrees;
     [Range(0f, 1f)]
-    public float treeFloat;
+    public float treeHeight;
     // trees per quadrant row/column
     // more than 16 is just nuts
     [Range(0, 16)]
@@ -44,17 +45,41 @@ public class ChunkGenerator : MonoBehaviour
 
     public bool generateRocks;
     [Range(0f, 1f)]
-    public float rockFloat;
+    public float rockHeight;
     [Range(0, 16)]
     public int rockDensity;
     public GameObject[] rockPrefabs;
     public Transform rockContainer;
     private bool rocks;
-
+    
+    public enum TextureType
+    {
+        Coloured,
+        Blended
+    }
+    public TextureType textureType;
     public Gradient colouring;
+    
+    [System.Serializable]
+    public struct GroundTexture
+    {
+        public string name;
+        public Texture2D tex;
+        [Range(0f, 1f)]
+        public float heightMin;
+        [Range(0f, 1f)]
+        public float heightMax;
+    }
+    public GroundTexture[] groundTextures;
+    // Should look something like this
+    //  |--------,------------,-------,------------,-------|
+    //  0             blend                blend           1
+    // amin     amax         bmin    bmax         cmin    cmax
+    //
+    // So the first texture has heightMin = 0, and last has heightMax = 1
+    // and the rest have heightMax < heightMin for the next one along
 
     private Texture2D noiseTex;
-    private Sprite sprite;
 
     void Start()
     {
@@ -152,11 +177,24 @@ public class ChunkGenerator : MonoBehaviour
 
                 sample = sample * 0.5f + 0.5f;
 
-                noiseTex.SetPixel(x, y, colouring.Evaluate(sample));
+                switch (textureType)
+                {
+                    case TextureType.Coloured:
+                        noiseTex.SetPixel(x, y, colouring.Evaluate(sample));
+                        break;
+                    case TextureType.Blended:
+                        var textures = GetTextures(sample);
+                        if (textures.Length == 2)
+                            noiseTex.SetPixel(x, y, BlendTexture(sample, x, y, textures[0], textures[1]));
+                        else
+                            noiseTex.SetPixel(x, y, textures[0].tex.GetPixel(x, y));
+                        break;
+                }   
+
                 if (trees && x % treePos == 0 && y % treePos == 0)
                 {
                     // place tree at point if greater than tree float
-                    if (sample < treeFloat)
+                    if (sample > treeHeight)
                     {
                         var treePoint = point * scale;
                         var prefab = treePrefabs[Random.Range(0, treePrefabs.Length)];
@@ -165,7 +203,7 @@ public class ChunkGenerator : MonoBehaviour
                 }
                 if (rocks && x % rockPos == 0 && y % rockPos == 0)
                 {
-                    if (sample > (1 - rockFloat))
+                    if (sample > rockHeight)
                     {
                         var rockPoint = point * scale;
                         var prefab = rockPrefabs[Random.Range(0, rockPrefabs.Length)];
@@ -177,6 +215,54 @@ public class ChunkGenerator : MonoBehaviour
 
         // Copy the pixel data to the texture and load it into the GPU.
         noiseTex.Apply();
+    }
+
+    private GroundTexture[] GetTextures(float sample)
+    {
+        for (int i = 0; i < groundTextures.Length; i++)
+        {
+            GroundTexture texA = groundTextures[i];
+            GroundTexture texB;
+            if (i < groundTextures.Length - 1) texB = groundTextures[i + 1];
+            // If we reach this point, its only the last texture
+            else return new GroundTexture[] { texA };
+
+            // in this case, we need to blend the textures
+            if (sample > texA.heightMax && sample < texB.heightMin)
+            {
+                return new GroundTexture[] { texA, texB };
+            }
+            // in this case, we only need that texture
+            if (sample >= texA.heightMin && sample < texA.heightMax)
+            {
+                return new GroundTexture[] { texA };
+            }
+        }
+
+        // Should never hit this
+        return null;
+    }
+
+    private Color BlendTexture(float sample, int x, int y, GroundTexture a, GroundTexture b)
+    {
+        var aPix = a.tex.GetPixel(x, y);
+        var bPix = b.tex.GetPixel(x, y);
+
+        var maxDiff = b.heightMin - a.heightMax;
+        var currentDiff = sample - a.heightMax;
+        if (currentDiff < 0)
+        {
+            return aPix;
+        }
+        else if (currentDiff > maxDiff)
+        {
+            return bPix;
+        }
+        var t = currentDiff / maxDiff;
+
+        var colour = new Color(Mathf.Lerp(aPix.r, bPix.r, t), Mathf.Lerp(aPix.g, bPix.g, t), Mathf.Lerp(aPix.b, bPix.b, t), 1);
+
+        return colour;
     }
 
     //void Update()

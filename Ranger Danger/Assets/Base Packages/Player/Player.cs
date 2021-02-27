@@ -4,6 +4,17 @@ using UnityEngine;
 
 public class Player : MonoBehaviour
 {
+    //Player State Variables
+    public enum playerState
+    {
+        Idle,
+        Walk,
+        Sprint,
+        Recovering,
+        Exhausted
+    }
+    public playerState state;
+
     // Speed Variables
     public float speed = 1.75f;
     public float sprintSpeed = 2.5f;
@@ -17,7 +28,7 @@ public class Player : MonoBehaviour
     public float availableStamina = 4.0f;
     public float minimumStamina;
     public float maximumStamina = 4.0f;
-
+    //Stamina Timers
     private float timer = 0f;
     public float exhaustionTime = 3f;
    
@@ -31,17 +42,8 @@ public class Player : MonoBehaviour
     private float upDownInput;      // Up or Down
     public float isSprinting;       // Sprint
 
-
-    public enum playerState
-    {
-        Idle,
-        Walk,
-        Sprint,
-        Recovering,
-        Exhausted
-    }
-
-    public playerState state;
+    //Debug
+    SpriteRenderer playerSprite;
 
     private void Awake()
     {
@@ -63,7 +65,8 @@ public class Player : MonoBehaviour
         normalSpeed = speed;
         availableStamina = maximumStamina;
         minimumStamina = 0.1f;
-
+        //Debug
+        playerSprite = GetComponent<SpriteRenderer>();
     }
 
     void Update()
@@ -73,25 +76,33 @@ public class Player : MonoBehaviour
         GetPlayerState();
 
         currentPosition = transform.position;
-        
     }
 
     private void FixedUpdate()
     {
-        //if the player is holding shift, not tired and has stamina they can sprint
+        Sprinting();
+
+        currentPosition.x += leftRightInput * speed * Time.fixedDeltaTime;
+
+        currentPosition.y += upDownInput * speed * Time.fixedDeltaTime;
+
+        transform.position = currentPosition;
+    }
+
+    ///  <summary>  ///
+    ///   METHODS   ///
+    /// </summary>  ///
+
+    public void Sprinting()
+    {
+        //If the player is holding shift, not tired and has stamina they can sprint
         if (state == playerState.Sprint)
         {
             speed = Mathf.Lerp(speed, sprintSpeed, accelerationRate * Time.fixedDeltaTime);     //Over time increase sprinting speed
             availableStamina -= exhaustionRate * Time.fixedDeltaTime;     //Over time decrease stamina.
         }
 
-        //    if (isExhausted == true && isSprinting >= 0.5f)
-        //   {
-        //      availableStamina = Mathf.Lerp(availableStamina, maximumStamina, exhaustionRate);
-
-        //  }
-
-
+        //If the player is not making any stamina exhausting movements
         if (state == playerState.Recovering || state == playerState.Walk || state == playerState.Idle)
         {
             availableStamina = Mathf.Lerp(availableStamina, maximumStamina, agility * Time.fixedDeltaTime);
@@ -102,51 +113,57 @@ public class Player : MonoBehaviour
         {
             speed = Mathf.Lerp(speed, normalSpeed, decelerationRate * Time.fixedDeltaTime);
         }
+
+        //If the player stops moving/looses input
         if (state == playerState.Idle)
         {
             speed = Mathf.Lerp(speed, 0, decelerationRate * Time.fixedDeltaTime);
         }
-
-        currentPosition.x += leftRightInput * speed * Time.fixedDeltaTime;
-
-        currentPosition.y += upDownInput * speed * Time.fixedDeltaTime;
-
-        transform.position = currentPosition;
     }
-
-
-    public void Sprinting()
-    {
-           
-    }
-
 
     public void GetPlayerState()
     {
-        if (isSprinting >= 0.5f && availableStamina <= minimumStamina) // holding shift and lacking stamina
+        //If the player is holding shift and lacking stamina
+        if (isSprinting >= 0.5f && availableStamina <= minimumStamina) 
         {
             timer += Time.fixedDeltaTime;
             state = playerState.Exhausted;
-            //minimumStamina = 0.25f * maximumStamina;
+            //Debug
+            DebugState();
         }
 
-
-        if (isSprinting < 0.5f && availableStamina <= minimumStamina && timer > exhaustionTime) // not holding shift and lacking stamina
+        //If the player is not holding shift and their stamina is less than the max and they are no longer exhausted
+        if (isSprinting < 0.5f && availableStamina <= minimumStamina && timer > exhaustionTime) 
         {
             state = playerState.Recovering;
             timer = 0;
+            //Debug
+            DebugState();
+        }
+
+        //If the player is holding down shift and not exhausted 
+        if (isSprinting >= 0.5f && state != playerState.Exhausted) 
+        {
+            state = playerState.Sprint;
+            //Debug
+            DebugState();
         }
         
-        if (isSprinting >= 0.5f && state != playerState.Exhausted) //Holding down Shift
-            state = playerState.Sprint;
-
-        if (isSprinting < 0.5f && state != playerState.Exhausted)  //Not holding shift
+        //If the player is not holding shift and not exhausted
+        if (isSprinting < 0.5f && state != playerState.Exhausted)
+        {
             state = playerState.Walk;
-
+            //Debug
+            DebugState();
+        }
+            
+        //If the player is doing nothing
         if (leftRightInput == 0 && upDownInput == 0 && timer == 0)  //doing nothing
+        {
             state = playerState.Idle;
-
-        //print(state);
+            //Debug
+            DebugState();
+        }    
     }
 
     public void ReadInputs()
@@ -156,6 +173,20 @@ public class Player : MonoBehaviour
         upDownInput = playerControls.NormalMovement.UpDown.ReadValue<float>();
 
         isSprinting = playerControls.NormalMovement.Sprint.ReadValue<float>();
+    }
+
+    public void DebugState()
+    {
+        if (state == playerState.Idle)
+            playerSprite.sprite = Resources.Load<Sprite>(state.ToString());
+        if (state == playerState.Walk)
+            playerSprite.sprite = Resources.Load<Sprite>(state.ToString());
+        if (state == playerState.Sprint)
+            playerSprite.sprite = Resources.Load<Sprite>(state.ToString());
+        if(state == playerState.Recovering)
+            playerSprite.sprite = Resources.Load<Sprite>(state.ToString());
+        if(state == playerState.Exhausted)
+            playerSprite.sprite = Resources.Load<Sprite>(state.ToString());
     }
 }
 

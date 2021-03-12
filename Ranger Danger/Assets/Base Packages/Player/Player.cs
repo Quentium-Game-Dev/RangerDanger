@@ -15,7 +15,7 @@ public class Player : MonoBehaviour
     }
     public playerState state;
 
-    // Speed Variables
+    //Speed Variables
     public float speed = 1.75f;
     public float sprintSpeed = 2.5f;
     private float normalSpeed;
@@ -32,8 +32,13 @@ public class Player : MonoBehaviour
     private float timer = 0f;
     public float exhaustionTime = 3f;
    
-    // Players current position in the game world
+    //Players current position in the game world
     private Vector2 currentPosition;
+
+    //Mouse positon in game world
+    private Vector3 mousePosistion;
+    [SerializeField]
+    private Camera playerCam;
    
     // Calls player controller
     private PlayerControls playerControls;
@@ -80,6 +85,8 @@ public class Player : MonoBehaviour
 
     private void FixedUpdate()
     {
+        Aiming();
+
         Sprinting();
 
         currentPosition.x += leftRightInput * speed * Time.fixedDeltaTime;
@@ -92,6 +99,21 @@ public class Player : MonoBehaviour
     ///  <summary>  ///
     ///   METHODS   ///
     /// </summary>  ///
+
+
+    public void Aiming()
+    {
+        Vector3 desiredLookDirection = new Vector3(mousePosistion.x, mousePosistion.y, 1);
+
+        Vector2 projectedPos = playerCam.ScreenToWorldPoint(desiredLookDirection);
+
+        Vector2 direction = new Vector2(
+            projectedPos.x - transform.position.x,
+            projectedPos.y - transform.position.y
+            );
+
+        transform.up = direction;
+    }
 
     public void Sprinting()
     {
@@ -108,9 +130,11 @@ public class Player : MonoBehaviour
             availableStamina = Mathf.Lerp(availableStamina, maximumStamina, agility * Time.fixedDeltaTime);
         }
 
-        //If the player is exhausted and they are still sprinting
+        //If the player is exhausted or walking
         if (state == playerState.Exhausted || state == playerState.Walk)
         {
+            if (state == playerState.Exhausted)
+                timer += Time.fixedDeltaTime;
             speed = Mathf.Lerp(speed, normalSpeed, decelerationRate * Time.fixedDeltaTime);
         }
 
@@ -126,7 +150,6 @@ public class Player : MonoBehaviour
         //If the player is holding shift and lacking stamina
         if (isSprinting >= 0.5f && availableStamina <= minimumStamina) 
         {
-            timer += Time.fixedDeltaTime;
             state = playerState.Exhausted;
             //Debug
             DebugState();
@@ -173,6 +196,8 @@ public class Player : MonoBehaviour
         upDownInput = playerControls.NormalMovement.UpDown.ReadValue<float>();
 
         isSprinting = playerControls.NormalMovement.Sprint.ReadValue<float>();
+
+        mousePosistion = playerControls.Combat.Aim.ReadValue<Vector2>();
     }
 
     public void DebugState()

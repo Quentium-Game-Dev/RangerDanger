@@ -1075,6 +1075,7 @@ MonoBehaviour:
   minimumStamina: 0.1
   maximumStamina: 4
   exhaustionTime: 3
+  playerCam: {fileID: 1599871651}
   isSprinting: 0
 --- !u!212 &1305674493
 SpriteRenderer:

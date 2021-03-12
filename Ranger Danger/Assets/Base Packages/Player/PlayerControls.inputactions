@@ -109,6 +109,33 @@
                     "isPartOfComposite": false
                 }
             ]
+        },
+        {
+            "name": "Combat",
+            "id": "6899c78a-4c8b-441e-aaa2-ff1389100d25",
+            "actions": [
+                {
+                    "name": "Aim",
+                    "type": "Value",
+                    "id": "f85d5036-5622-4547-817c-766dae07d1ea",
+                    "expectedControlType": "Vector2",
+                    "processors": "",
+                    "interactions": ""
+                }
+            ],
+            "bindings": [
+                {
+                    "name": "",
+                    "id": "dd6183fd-fc8a-4736-86bd-b96f8a6da028",
+                    "path": "<Mouse>/position",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Aim",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                }
+            ]
         }
     ],
     "controlSchemes": []

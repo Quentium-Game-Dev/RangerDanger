@@ -122,6 +122,33 @@ public class @PlayerControls : IInputActionCollection, IDisposable
                     ""isPartOfComposite"": false
                 }
             ]
+        },
+        {
+            ""name"": ""Combat"",
+            ""id"": ""6899c78a-4c8b-441e-aaa2-ff1389100d25"",
+            ""actions"": [
+                {
+                    ""name"": ""Aim"",
+                    ""type"": ""Value"",
+                    ""id"": ""f85d5036-5622-4547-817c-766dae07d1ea"",
+                    ""expectedControlType"": ""Vector2"",
+                    ""processors"": """",
+                    ""interactions"": """"
+                }
+            ],
+            ""bindings"": [
+                {
+                    ""name"": """",
+                    ""id"": ""dd6183fd-fc8a-4736-86bd-b96f8a6da028"",
+                    ""path"": ""<Mouse>/position"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Aim"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                }
+            ]
         }
     ],
     ""controlSchemes"": []
@@ -131,6 +158,9 @@ public class @PlayerControls : IInputActionCollection, IDisposable
         m_NormalMovement_LeftRight = m_NormalMovement.FindAction("LeftRight", throwIfNotFound: true);
         m_NormalMovement_UpDown = m_NormalMovement.FindAction("UpDown", throwIfNotFound: true);
         m_NormalMovement_Sprint = m_NormalMovement.FindAction("Sprint", throwIfNotFound: true);
+        // Combat
+        m_Combat = asset.FindActionMap("Combat", throwIfNotFound: true);
+        m_Combat_Aim = m_Combat.FindAction("Aim", throwIfNotFound: true);
     }
 
     public void Dispose()
@@ -225,10 +255,47 @@ public class @PlayerControls : IInputActionCollection, IDisposable
         }
     }
     public NormalMovementActions @NormalMovement => new NormalMovementActions(this);
+
+    // Combat
+    private readonly InputActionMap m_Combat;
+    private ICombatActions m_CombatActionsCallbackInterface;
+    private readonly InputAction m_Combat_Aim;
+    public struct CombatActions
+    {
+        private @PlayerControls m_Wrapper;
+        public CombatActions(@PlayerControls wrapper) { m_Wrapper = wrapper; }
+        public InputAction @Aim => m_Wrapper.m_Combat_Aim;
+        public InputActionMap Get() { return m_Wrapper.m_Combat; }
+        public void Enable() { Get().Enable(); }
+        public void Disable() { Get().Disable(); }
+        public bool enabled => Get().enabled;
+        public static implicit operator InputActionMap(CombatActions set) { return set.Get(); }
+        public void SetCallbacks(ICombatActions instance)
+        {
+            if (m_Wrapper.m_CombatActionsCallbackInterface != null)
+            {
+                @Aim.started -= m_Wrapper.m_CombatActionsCallbackInterface.OnAim;
+                @Aim.performed -= m_Wrapper.m_CombatActionsCallbackInterface.OnAim;
+                @Aim.canceled -= m_Wrapper.m_CombatActionsCallbackInterface.OnAim;
+            }
+            m_Wrapper.m_CombatActionsCallbackInterface = instance;
+            if (instance != null)
+            {
+                @Aim.started += instance.OnAim;
+                @Aim.performed += instance.OnAim;
+                @Aim.canceled += instance.OnAim;
+            }
+        }
+    }
+    public CombatActions @Combat => new CombatActions(this);
     public interface INormalMovementActions
     {
         void OnLeftRight(InputAction.CallbackContext context);
         void OnUpDown(InputAction.CallbackContext context);
         void OnSprint(InputAction.CallbackContext context);
+    }
+    public interface ICombatActions
+    {
+        void OnAim(InputAction.CallbackContext context);
     }
 }

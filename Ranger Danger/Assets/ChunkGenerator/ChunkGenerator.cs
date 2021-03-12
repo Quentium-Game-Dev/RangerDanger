@@ -117,8 +117,6 @@ public class ChunkGenerator : MonoBehaviour
         trees = generateTrees && treeDensity != 0;
         rocks = generateRocks && rockDensity != 0;
 
-        if (randomiseHash)
-            Noise.RandomiseHash();
         if (randomiseSeed)
         {
             Random.InitState((int)System.DateTime.UtcNow.ToBinary());

@@ -4,6 +4,8 @@ public struct NoiseSample
 {
     public float value;
     public Vector3 derivative;
+    public Vector3 point;
+    public Vector3 point0;
 
     public static NoiseSample operator +(NoiseSample a, float b)
     {

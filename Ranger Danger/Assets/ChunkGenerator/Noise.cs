@@ -106,8 +106,9 @@ public static class Noise
 			list[n] = value;
 		}
 	}
-	public static void RandomiseHash()
+	public static void RandomiseHash(int seed)
     {
+		Random.InitState(seed);
 		numbers = Enumerable.Range(0, hashMask + 1).ToList();
 		numbers.Shuffle();
 
@@ -256,7 +257,7 @@ public static class Noise
 		float a = h0;
 		float b = h1 - h0;
 
-		NoiseSample sample;
+		NoiseSample sample = new NoiseSample();
 		sample.value = a + b * t; // = Mathf.Lerp(h0, h1, t);
 		sample.derivative.x = b * dt;
 		sample.derivative.y = 0f;
@@ -293,7 +294,8 @@ public static class Noise
 		float b = h10 - h00;
 		float c = h01 - h00;
 		float d = h11 - h01 - h10 + h00;
-		NoiseSample sample;
+
+		NoiseSample sample = new NoiseSample();
 		sample.value = a + b * tx + (c + d * tx) * ty;
 		// = a + btx + cty + dtxty
 		// = h00 + (h10 - h00)tx + (h01 - h00)ty + (h11 - h01 - h10 + h00)txty
@@ -353,7 +355,7 @@ public static class Noise
 		float g = h011 - h001 - h010 + h000;
 		float h = h111 - h011 - h101 + h001 - h110 + h010 + h100 - h000;
 
-		NoiseSample sample;
+		NoiseSample sample = new NoiseSample();
 		sample.value = a + b*tx + c*ty + d*tz + e*tx*ty + f*tx*tz + g*ty*tz + h*tx*ty*tz;
 		// = Mathf.Lerp(
 		//		Mathf.Lerp(Mathf.Lerp(h000, h100, tx), Mathf.Lerp(h010, h110, tx), ty),
@@ -392,7 +394,7 @@ public static class Noise
 		float da = g0;
 		float db = g1 - g0;
 
-		NoiseSample sample;
+		NoiseSample sample = new NoiseSample();
 		sample.value = a + b * t;
 		sample.derivative.x = da + db * t + b * dt;
 		sample.derivative.y = 0f;
@@ -442,7 +444,7 @@ public static class Noise
 		Vector2 dc = g01 - g00;
 		Vector2 dd = g11 - g01 - g10 + g00;
 
-		NoiseSample sample;
+		NoiseSample sample = new NoiseSample();
 		sample.value = a + b * tx + (c + d * tx) * ty;
 		sample.derivative = da + db * tx + (dc + dd * tx) * ty;
 		sample.derivative.x += (b + d * ty) * dtx;
@@ -520,7 +522,7 @@ public static class Noise
 		Vector3 dg = g011 - g001 - g010 + g000;
 		Vector3 dh = g111 - g011 - g101 + g001 - g110 + g010 + g100 - g000;
 
-		NoiseSample sample;
+		NoiseSample sample = new NoiseSample();
 		sample.value = a + b * tx + (c + e * tx) * ty + (d + f * tx + (g + h * tx) * ty) * tz;
 		sample.derivative = da + db * tx + (dc + de * tx) * ty + (dd + df * tx + (dg + dh * tx) * ty) * tz;
 		sample.derivative.x += (b + e * ty + (f + h * ty) * tz) * dtx;

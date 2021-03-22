@@ -9,9 +9,9 @@ public class WorldChunk : MonoBehaviour
 
     // Various example properties for now
     public WorldChunk Prefab;
-    public int Width;
-    public int Height;
-    public Sprite Sprite;
+    public int Width = 2000;
+    public int Height = 2000;
+    public Transform Texture;
 
     public bool IsVisible = true;
     private float TimePass = 0.1f;
@@ -24,6 +24,8 @@ public class WorldChunk : MonoBehaviour
     public bool IsFirst = false;
     public int ChunkId;
 
+    public int seed;
+
     public enum Visibility
     {
         Fresh,
@@ -32,51 +34,39 @@ public class WorldChunk : MonoBehaviour
     }
     public Visibility ChunkVisibility;
 
-    private void Start()
+    public void Awake()
     {
         ChunkVisibility = Visibility.Fresh;
-        Sprite = GetComponent<SpriteRenderer>().sprite;
-        var size = Sprite.bounds.max - Sprite.bounds.min;
-        Width = (int)size.x;
-        Height = (int)size.y;
+        var chunkGen = GetComponentInChildren<ChunkTileGenerator>();
+        if (chunkGen != null) chunkGen.seed = seed;
     }
 
     // Update is called once per frame
     void Update()
     {
-        if (ChunkVisibility != Visibility.Fresh)
+        if (ChunkVisibility == Visibility.NotVisible)
         {
             TimePass += Time.deltaTime;
 
             if (TimePass > 0.5f)
             {
-                ChunkVisibility = Visibility.NotVisible;
                 ChunkDestroyEvent(this);
                 Destroy(gameObject);
             }
         }
     }
 
-    // method to check if the world chunk is in view
-    private void OnWillRenderObject()
+    private void OnBecameInvisible()
     {
-        if (TimePass >= 0.1f)
-        {
-            if (Camera.current.name != "SceneCamera")
-            {
-                //print(gameObject.name + " is being rendered by " + Camera.current.name + " at " + Time.time);
-                TimePass = 0.0f;
-                ChunkVisibility = Visibility.Visible;
-            }
-        }
+        print("not visible");
     }
 
     public bool IsPositionInChunk(Vector3 pos)
     {
         var globalPosition = transform.TransformPoint(Vector3.zero);
         return
-            pos.x > globalPosition.x - Width/2 && pos.x < globalPosition.x + Width/2 &&
-            pos.y > globalPosition.y - Height/2 && pos.y < globalPosition.y + Height/2;
+            pos.x > globalPosition.x - Width/2f && pos.x < globalPosition.x + Width/2f &&
+            pos.y > globalPosition.y - Height/2f && pos.y < globalPosition.y + Height/2f;
     }
 
     // method to spawn in enemies

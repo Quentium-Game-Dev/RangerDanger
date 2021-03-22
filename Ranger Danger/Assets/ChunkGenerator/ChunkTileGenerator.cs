@@ -1,15 +1,13 @@
 ﻿using UnityEngine;
 using Serializable = System.SerializableAttribute;
 
-public class TileGenerator : MonoBehaviour
+public class ChunkTileGenerator : MonoBehaviour
 {
     public int seed;
     // Used for custom noise function
     [Range(2, 512)]
     public int resolution;
     public float frequency = 1f;
-
-    public bool randomiseSeed;
 
     public NoiseMethodType type;
     public bool useFractal;
@@ -29,7 +27,7 @@ public class TileGenerator : MonoBehaviour
     // Renderer to visualise the noise
     public Transform noiseRenderer;
 
-    public Vector3 displacement = new Vector3(20, 20);
+    public Vector3 chunkSize;
 
     public bool generateObjects;
     [Serializable]
@@ -94,17 +92,8 @@ public class TileGenerator : MonoBehaviour
             genObject.canGenerate = genObject.generate && genObject.density != 0;
         }
 
-        if (randomiseSeed)
-        {
-            var seed = (int)System.DateTime.UtcNow.ToBinary();
-            print(seed);
-            Random.InitState(seed);
-            Noise.RandomiseHash(seed);
-        }
-        else
-        {
-            Random.InitState(seed);
-        }
+        Random.InitState(seed);
+        chunkSize = new Vector3(resolution, resolution);
 
         if (textureType == TextureType.Coloured) tileContainer = null;
         else
